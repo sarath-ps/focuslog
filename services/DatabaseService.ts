@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Session, Interruption, SessionStatus } from '@/types';
+import { Session, Interruption, SessionStatus, BreakActivity } from '@/types';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -45,6 +45,16 @@ export const DatabaseService = {
         occurred_at TEXT NOT NULL,
         category TEXT NOT NULL,
         source TEXT NOT NULL,
+        audio_uri TEXT,
+        transcript TEXT,
+        FOREIGN KEY (pomodoro_id) REFERENCES pomodoro_sessions (id)
+      );
+
+      CREATE TABLE IF NOT EXISTS break_activities (
+        id TEXT PRIMARY KEY NOT NULL,
+        pomodoro_id TEXT NOT NULL UNIQUE,
+        occurred_at TEXT NOT NULL,
+        category TEXT NOT NULL,
         audio_uri TEXT,
         transcript TEXT,
         FOREIGN KEY (pomodoro_id) REFERENCES pomodoro_sessions (id)
@@ -162,5 +172,24 @@ export const DatabaseService = {
         'UPDATE day_logs SET interrupted_pomodoros = interrupted_pomodoros + 1 WHERE id = ?',
         [dayId]
       );
+  },
+
+  async logBreakActivity(activity: BreakActivity) {
+    const db = await this.getDB();
+    // Using INSERT OR REPLACE to handle updates (user changing mind on chip)
+    // pomodoro_id is UNIQUE in break_activities table
+    await db.runAsync(
+      `INSERT OR REPLACE INTO break_activities (
+        id, pomodoro_id, occurred_at, category, audio_uri, transcript
+      ) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        activity.id,
+        activity.sessionId,
+        activity.createdAt,
+        activity.category,
+        activity.voiceNote?.uri ?? null,
+        activity.voiceNote?.transcription ?? null
+      ]
+    );
   }
 };

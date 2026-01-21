@@ -10,10 +10,11 @@ export default function BreakScreen() {
   const router = useRouter();
   const {
     startBreak,
+    extendBreak,
+    endBreak,
     setBreakActivity,
     timer,
     syncTimer,
-    endSession,
     status,
     currentSessionId
   } = useFocusStore();
@@ -48,7 +49,7 @@ export default function BreakScreen() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [status, timer]);
+  }, [status, timer, syncTimer]);
 
   const handleActivity = (category: BreakActivity['category']) => {
       if (!currentSessionId) return;
@@ -61,11 +62,23 @@ export default function BreakScreen() {
       });
   };
 
-  const handleEndBreak = () => {
-      // Logic for next pomodoro or end session
-      // For MVP flow, let's just end session and go home
+  const handleStartFocus = () => {
       cancelNotifications();
-      endSession();
+      endBreak(); // Clean up break state
+      // Logic to start new session would be here, but we just go to intent
+      router.replace('/');
+  };
+
+  const handleExtendBreak = () => {
+      cancelNotifications(); // Cancel 'Break Over' notification
+      extendBreak(5);
+      // Re-schedule notification for new time
+      scheduleNotification(timer + (5 * 60), 'Break Over', 'Time to focus again!');
+  };
+
+  const handleEndBreak = () => {
+      cancelNotifications();
+      endBreak();
       router.replace('/');
   };
 
@@ -75,31 +88,50 @@ export default function BreakScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const isBreakOver = timer === 0;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Break Time</Text>
+      <Text style={styles.header}>{isBreakOver ? "Break Over" : "Break Time"}</Text>
 
       <View style={styles.timerContainer}>
          <Text style={styles.timerText}>{formatTime(timer)}</Text>
       </View>
 
-      <Text style={styles.subtext}>What are you doing?</Text>
+      {!isBreakOver && (
+        <>
+          <Text style={styles.subtext}>What are you doing?</Text>
+          <View style={styles.chipsContainer}>
+            {['Coffee', 'Social', 'Phone', 'Walk', 'Food', 'Rest'].map((chip) => (
+                <TouchableOpacity
+                    key={chip}
+                    style={styles.chip}
+                    onPress={() => handleActivity(chip.toLowerCase() as BreakActivity['category'])}
+                >
+                    <Text style={styles.chipText}>{chip}</Text>
+                </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
 
-      <View style={styles.chipsContainer}>
-        {['Coffee', 'Social', 'Walk', 'Food', 'Rest'].map((chip) => (
-            <TouchableOpacity
-                key={chip}
-                style={styles.chip}
-                onPress={() => handleActivity(chip.toLowerCase() as BreakActivity['category'])}
-            >
-                <Text style={styles.chipText}>{chip}</Text>
+      {isBreakOver ? (
+        <View style={styles.controls}>
+             <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={handleStartFocus}>
+                <Text style={[styles.buttonText, styles.primaryButtonText]}>Start Focus</Text>
             </TouchableOpacity>
-        ))}
-      </View>
-
-      <TouchableOpacity style={styles.button} onPress={handleEndBreak}>
-          <Text style={styles.buttonText}>End Session</Text>
-      </TouchableOpacity>
+             <TouchableOpacity style={styles.button} onPress={handleExtendBreak}>
+                <Text style={styles.buttonText}>Extend (+5m)</Text>
+            </TouchableOpacity>
+             <TouchableOpacity style={styles.button} onPress={handleEndBreak}>
+                <Text style={styles.buttonText}>End Session</Text>
+            </TouchableOpacity>
+        </View>
+      ) : (
+         <TouchableOpacity style={styles.button} onPress={handleEndBreak}>
+            <Text style={styles.buttonText}>End Session</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -147,15 +179,28 @@ const styles = StyleSheet.create({
   chipText: {
     color: 'white',
   },
+  controls: {
+    gap: 15,
+    width: '100%',
+    alignItems: 'center',
+  },
   button: {
-      backgroundColor: 'white',
+      backgroundColor: 'rgba(255,255,255,0.2)',
       paddingHorizontal: 40,
       paddingVertical: 15,
       borderRadius: 30,
+      minWidth: 200,
+      alignItems: 'center',
+  },
+  primaryButton: {
+      backgroundColor: 'white',
   },
   buttonText: {
-      color: Colors.dark.secondary,
+      color: 'white',
       fontWeight: 'bold',
       fontSize: 16,
+  },
+  primaryButtonText: {
+      color: Colors.dark.secondary,
   }
 });

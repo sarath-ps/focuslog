@@ -21,7 +21,7 @@ export type BreakActivity = {
   id: string;
   sessionId: string;
   type: 'voice' | 'touch';
-  category: 'coffee' | 'phone' | 'walk' | 'food' | 'rest' | 'other';
+  category: 'coffee' | 'phone' | 'social' | 'walk' | 'food' | 'rest' | 'other';
   voiceNote?: VoiceNote;
   createdAt: string;
 };
