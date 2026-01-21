@@ -48,7 +48,7 @@ export default function BreakScreen() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [status, syncTimer]);
+  }, [status, timer]);
 
   const handleActivity = (category: BreakActivity['category']) => {
       if (!currentSessionId) return;

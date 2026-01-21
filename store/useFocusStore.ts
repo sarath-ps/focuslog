@@ -1,5 +1,18 @@
 import { create } from 'zustand';
 import { SessionStatus, Session, Interruption, BreakActivity } from '@/types';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+
+// Configure notifications only if not on web (or wrap in check)
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 interface FocusState {
   status: SessionStatus;
@@ -10,6 +23,10 @@ interface FocusState {
   currentSessionId: string | null;
   currentSession: Session | null;
 
+  // Timestamps for robustness
+  endTime: number | null; // epoch ms
+  pausedAt: number | null; // epoch ms
+
   // Actions
   setStatus: (status: SessionStatus) => void;
   syncTimer: () => void; // Updates 'timer' based on 'endTime'
@@ -18,6 +35,8 @@ interface FocusState {
   resumeSession: () => void;
   endSession: () => void;
   startBreak: (durationMinutes: number) => void;
+
+  // Data logging
   addInterruption: (interruption: Interruption) => void;
   setBreakActivity: (activity: BreakActivity) => void;
   completeSession: () => void;
@@ -136,3 +155,29 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     currentSession: null
   })
 }));
+
+async function scheduleEndNotification(seconds: number) {
+  if (Platform.OS === 'web') return;
+
+  try {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== 'granted') {
+          const { status: newStatus } = await Notifications.requestPermissionsAsync();
+          if (newStatus !== 'granted') return;
+      }
+
+      await Notifications.cancelAllScheduledNotificationsAsync();
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Time's up!",
+          body: "Session completed.",
+          sound: true,
+        },
+        trigger: {
+          seconds: seconds,
+        } as any,
+      });
+  } catch (error) {
+      console.warn("Notification scheduling failed", error);
+  }
+}
