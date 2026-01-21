@@ -2,29 +2,53 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useFocusStore } from '@/store/useFocusStore';
+import { useNotifications } from '@/hooks/useNotifications';
 import { BreakActivity } from '@/types';
 import { useEffect } from 'react';
 
 export default function BreakScreen() {
   const router = useRouter();
-  const { startBreak, setBreakActivity, timer, decrementTimer, endSession, status, currentSessionId } = useFocusStore();
+  const {
+    startBreak,
+    setBreakActivity,
+    timer,
+    syncTimer,
+    endSession,
+    status,
+    currentSessionId
+  } = useFocusStore();
+
+  const { scheduleNotification, cancelNotifications } = useNotifications();
 
   useEffect(() => {
      // If we just landed here from Timer, we need to initialize the break
      if (status === 'focus') {
          startBreak(5); // Default 5 min break
      }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
+  useEffect(() => {
+    // Schedule break completion notification
+    if (status === 'break') {
+      scheduleNotification(timer, 'Break Over', 'Time to focus again!');
+    }
+    return () => {
+      // Clean up if we leave
+      cancelNotifications();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]); // Only when status switches to break or we re-mount. Avoid adding timer.
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (status === 'break' && timer > 0) {
+    if (status === 'break') {
       interval = setInterval(() => {
-        decrementTimer();
+        syncTimer();
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [status, timer]);
+  }, [status, syncTimer]);
 
   const handleActivity = (category: BreakActivity['category']) => {
       if (!currentSessionId) return;
@@ -40,6 +64,7 @@ export default function BreakScreen() {
   const handleEndBreak = () => {
       // Logic for next pomodoro or end session
       // For MVP flow, let's just end session and go home
+      cancelNotifications();
       endSession();
       router.replace('/');
   };

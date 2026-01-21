@@ -2,48 +2,85 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useFocusStore } from '@/store/useFocusStore';
-import { useEffect } from 'react';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useEffect, useRef } from 'react';
 
 export default function TimerScreen() {
   const router = useRouter();
-  const { timer, status, pauseSession, decrementTimer, endSession } = useFocusStore();
+  const {
+    timer,
+    status,
+    pauseSession,
+    syncTimer,
+    endSession,
+    completeSession,
+    completedSessionsCount
+  } = useFocusStore();
 
+  const { scheduleNotification, cancelNotifications } = useNotifications();
+  const timerRef = useRef(timer);
+  const countRef = useRef(completedSessionsCount);
+
+  // Keep refs updated for effects that shouldn't re-run on every tick
+  useEffect(() => {
+    timerRef.current = timer;
+  }, [timer]);
+
+  useEffect(() => {
+    countRef.current = completedSessionsCount;
+  }, [completedSessionsCount]);
+
+  // Handle Notifications
+  useEffect(() => {
+    if (status === 'focus') {
+      // Schedule notification for when the timer is expected to end
+      // Use ref value if necessary, but here we want the current timer value at the start of focus
+      // Since this effect depends on status, it runs when status becomes 'focus'
+      // At that moment, 'timer' is correct (duration or remaining)
+      scheduleNotification(
+        timer,
+        'Focus Complete',
+        `Focus session #${completedSessionsCount + 1} completed`
+      );
+    } else {
+      cancelNotifications();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
+  // We explicitly disable exhaustive-deps here because we ONLY want to schedule when status changes to focus.
+  // Adding 'timer' would cause rescheduling every second.
+  // Adding 'completedSessionsCount', 'scheduleNotification', 'cancelNotifications' is fine but 'timer' is the blocker.
+  // Since 'timer' is used as the initial duration for the schedule, capturing it when status changes is exactly what we want.
+
+  // Timer Tick
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
-    // Only set interval if focused
     if (status === 'focus') {
       interval = setInterval(() => {
-        // We check the timer value inside the store updater or here?
-        // useFocusStore's decrementTimer uses `set((state) => ...)` so it always has latest state.
-        // But we need to check if we hit 0 to navigate.
-        // Best practice: The store should probably handle the "tick" and return the new value,
-        // or we check the value in a separate effect or inside the interval (with a ref or get() if we had it).
-        // Since we are subscribing to `timer` via the hook, let's keep it simple for now but avoid re-creating interval on every tick.
-        // Actually, if we include `timer` in deps, it recreates. If we don't, `timer` is stale inside closure.
-
-        // Solution: Use the store's action to tick.
-        // To handle navigation on 0, we can use a separate effect.
-        decrementTimer();
+        syncTimer();
       }, 1000);
     }
 
     return () => clearInterval(interval);
-  }, [status]); // Removed `timer` dependency to avoid recreating interval every second.
+  }, [status, syncTimer]);
 
-  // Separate effect to handle timer completion
+  // Completion Check
   useEffect(() => {
     if (timer === 0 && status === 'focus') {
+      completeSession();
       router.replace('/break');
     }
-  }, [timer, status]);
+  }, [timer, status, completeSession, router]);
 
   const handlePause = () => {
+    cancelNotifications(); // Ensure cancelled immediately
     pauseSession();
     router.push('/interruption');
   };
 
   const handleEnd = () => {
+      cancelNotifications();
       endSession();
       router.replace('/');
   };
