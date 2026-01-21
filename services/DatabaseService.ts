@@ -3,7 +3,15 @@ import { Session, Interruption, SessionStatus, BreakActivity } from '@/types';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
+/**
+ * Service for managing SQLite database operations for FocusLog app.
+ * Handles storage of sessions, interruptions, breaks, and daily logs.
+ */
 export const DatabaseService = {
+  /**
+   * Gets or creates the database instance
+   * @returns Promise resolving to the database instance
+   */
   async getDB() {
     if (!db) {
       db = await SQLite.openDatabaseAsync('focuslog.db');
@@ -11,6 +19,10 @@ export const DatabaseService = {
     return db;
   },
 
+  /**
+   * Initializes database tables and indexes
+   * Creates tables for day logs, pomodoro sessions, interruptions, and break activities
+   */
   async initDatabase() {
     const db = await this.getDB();
     await db.execAsync(`
@@ -63,6 +75,11 @@ export const DatabaseService = {
     console.log('Database initialized successfully');
   },
 
+  /**
+   * Ensures a day log exists for the given date, creating one if necessary
+   * @param date - Date string in YYYY-MM-DD format
+   * @returns Promise resolving to the day log ID
+   */
   async ensureDayLog(date: string): Promise<string> {
     const db = await this.getDB();
     const existing = await db.getFirstAsync<{ id: string }>('SELECT id FROM day_logs WHERE date = ?', [date]);
@@ -80,6 +97,10 @@ export const DatabaseService = {
     return id;
   },
 
+  /**
+   * Creates a new pomodoro session in the database
+   * @param session - Session object to create
+   */
   async createSession(session: Session) {
     const db = await this.getDB();
     await db.runAsync(
