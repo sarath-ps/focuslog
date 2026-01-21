@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from 'react-native';
 import { useFocusStore } from '@/store/useFocusStore';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -33,16 +34,18 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
-        <Stack.Screen name="intent" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="timer" options={{ gestureEnabled: false }} />
-        <Stack.Screen name="interruption" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="break" options={{ gestureEnabled: false }} />
-        <Stack.Screen name="review" options={{ presentation: 'modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="intent" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="timer" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="interruption" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="break" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="review" options={{ presentation: 'modal' }} />
+        </Stack>
+        <StatusBar style="auto" />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
