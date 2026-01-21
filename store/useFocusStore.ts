@@ -5,21 +5,15 @@ import { Platform } from 'react-native';
 import { DatabaseService } from '@/services/DatabaseService';
 
 // Configure notifications only if not on web (or wrap in check)
-// Moved inside init or wrapped to avoid top-level crash on Android (Expo Go)
-const initNotifications = async () => {
-  if (Platform.OS === 'web') return;
-  try {
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
-    });
-  } catch (e) {
-    console.warn("Failed to set notification handler", e);
-  }
-};
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+}
 
 interface FocusState {
   status: SessionStatus;
@@ -59,8 +53,6 @@ export const useFocusStore = create<FocusState>((set, get) => ({
   currentSession: null,
 
   init: async () => {
-    await initNotifications();
-
     if (Platform.OS === 'web') {
        // Mock or use DatabaseService.web.ts if available
        // For Playwright tests on web, we might skip DB init or mock it
