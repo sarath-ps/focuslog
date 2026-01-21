@@ -1,5 +1,11 @@
+/**
+ * Represents the current state of a focus session
+ */
 export type SessionStatus = 'idle' | 'focus' | 'paused' | 'break';
 
+/**
+ * Voice recording metadata
+ */
 export type VoiceNote = {
   id: string;
   uri: string;
@@ -8,8 +14,14 @@ export type VoiceNote = {
   createdAt: string; // ISO date
 };
 
+/**
+ * Categories for interruption types
+ */
 export type InterruptionCategory = 'door' | 'work_call' | 'family' | 'notification' | 'lost_focus' | 'other';
 
+/**
+ * Represents an interruption event during a focus session
+ */
 export type Interruption = {
   id: string;
   sessionId: string;
@@ -19,8 +31,14 @@ export type Interruption = {
   createdAt: string;
 };
 
+/**
+ * Categories for break activities
+ */
 export type BreakActivityCategory = 'coffee' | 'phone' | 'social' | 'walk' | 'food' | 'rest' | 'other';
 
+/**
+ * Represents an activity logged during a break
+ */
 export type BreakActivity = {
   id: string;
   sessionId: string;
@@ -30,6 +48,9 @@ export type BreakActivity = {
   createdAt: string;
 };
 
+/**
+ * Represents a complete Pomodoro focus session
+ */
 export type Session = {
   id: string;
   status: SessionStatus;
