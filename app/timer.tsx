@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 
 export default function TimerScreen() {
   const router = useRouter();
-  const { timer, status, pauseSession, decrementTimer, endSession } = useFocusStore();
+  const { timer, status, pauseSession, tick, endSession } = useFocusStore();
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -14,22 +14,12 @@ export default function TimerScreen() {
     // Only set interval if focused
     if (status === 'focus') {
       interval = setInterval(() => {
-        // We check the timer value inside the store updater or here?
-        // useFocusStore's decrementTimer uses `set((state) => ...)` so it always has latest state.
-        // But we need to check if we hit 0 to navigate.
-        // Best practice: The store should probably handle the "tick" and return the new value,
-        // or we check the value in a separate effect or inside the interval (with a ref or get() if we had it).
-        // Since we are subscribing to `timer` via the hook, let's keep it simple for now but avoid re-creating interval on every tick.
-        // Actually, if we include `timer` in deps, it recreates. If we don't, `timer` is stale inside closure.
-
-        // Solution: Use the store's action to tick.
-        // To handle navigation on 0, we can use a separate effect.
-        decrementTimer();
+        tick();
       }, 1000);
     }
 
     return () => clearInterval(interval);
-  }, [status]); // Removed `timer` dependency to avoid recreating interval every second.
+  }, [status]);
 
   // Separate effect to handle timer completion
   useEffect(() => {

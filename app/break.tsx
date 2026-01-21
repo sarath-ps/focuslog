@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 
 export default function BreakScreen() {
   const router = useRouter();
-  const { startBreak, setBreakActivity, timer, decrementTimer, endSession, status, currentSessionId } = useFocusStore();
+  const { startBreak, setBreakActivity, timer, tick, endSession, status, currentSessionId } = useFocusStore();
 
   useEffect(() => {
      // If we just landed here from Timer, we need to initialize the break
@@ -18,13 +18,13 @@ export default function BreakScreen() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (status === 'break' && timer > 0) {
+    if (status === 'break') {
       interval = setInterval(() => {
-        decrementTimer();
+        tick();
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [status, timer]);
+  }, [status]);
 
   const handleActivity = (category: BreakActivity['category']) => {
       if (!currentSessionId) return;
