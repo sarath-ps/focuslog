@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Audio } from 'expo-av';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 
 export interface AudioRecording {
   uri: string;
@@ -52,8 +53,32 @@ export const useAudioRecorder = () => {
 
         if (!uri || !status.isLoaded) return null;
 
+        // Move the recording to a permanent location
+        let finalUri = uri;
+        if (Platform.OS !== 'web') {
+            try {
+                const recordingsDir = `${FileSystem.documentDirectory}recordings/`;
+                const dirInfo = await FileSystem.getInfoAsync(recordingsDir);
+                if (!dirInfo.exists) {
+                    await FileSystem.makeDirectoryAsync(recordingsDir, { intermediates: true });
+                }
+
+                const filename = `recording-${Date.now()}.m4a`;
+                finalUri = `${recordingsDir}${filename}`;
+
+                await FileSystem.moveAsync({
+                    from: uri,
+                    to: finalUri
+                });
+            } catch (fsError) {
+                console.warn('Failed to move recording to persistent storage', fsError);
+                // Fallback to original URI if move fails
+                finalUri = uri;
+            }
+        }
+
         return {
-            uri,
+            uri: finalUri,
             durationMs: status.durationMillis,
         };
     } catch (error) {
