@@ -24,6 +24,7 @@ interface FocusState {
   completedSessionsCount: number;
   currentSessionId: string | null;
   currentSession: Session | null;
+  lastError: string | null; // Track the last error that occurred
 
   // Actions
   init: () => Promise<void>;
@@ -42,6 +43,7 @@ interface FocusState {
   setBreakActivity: (activity: BreakActivity) => Promise<void>;
   completeSession: () => Promise<void>;
   reset: () => void;
+  clearError: () => void;
 }
 
 export const useFocusStore = create<FocusState>((set, get) => ({
@@ -52,6 +54,7 @@ export const useFocusStore = create<FocusState>((set, get) => ({
   completedSessionsCount: 0,
   currentSessionId: null,
   currentSession: null,
+  lastError: null,
 
   init: async () => {
     if (Platform.OS === 'web') {
@@ -62,8 +65,11 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     }
     try {
         await DatabaseService.initDatabase();
+        set({ lastError: null });
     } catch (e) {
-        console.warn("Database init failed (expected on web):", e);
+        const errorMessage = e instanceof Error ? e.message : 'Database init failed';
+        console.error("Database initialization error:", errorMessage);
+        set({ lastError: `Database init failed: ${errorMessage}` });
     }
   },
 
@@ -93,7 +99,12 @@ export const useFocusStore = create<FocusState>((set, get) => ({
              const sessionWithDay = { ...session, dayId };
              await DatabaseService.createSession(sessionWithDay);
         }
-    } catch (e) { console.warn("DB Session Start Failed", e) }
+        set({ lastError: null });
+    } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+        console.error("Failed to start session in database:", errorMessage);
+        set({ lastError: `Session start failed: ${errorMessage}` });
+    }
 
     const durationSeconds = session.durationMinutes * 60;
     const endTime = Date.now() + durationSeconds * 1000;
@@ -116,8 +127,15 @@ export const useFocusStore = create<FocusState>((set, get) => ({
 
     // Update DB status
     try {
-        if (Platform.OS !== 'web') await DatabaseService.updateSessionStatus(state.currentSessionId, 'paused');
-    } catch (e) {}
+        if (Platform.OS !== 'web') {
+            await DatabaseService.updateSessionStatus(state.currentSessionId, 'paused');
+        }
+        set({ lastError: null });
+    } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+        console.error("Failed to pause session in database:", errorMessage);
+        set({ lastError: `Pause failed: ${errorMessage}` });
+    }
 
     set({
       status: 'paused',
@@ -135,8 +153,15 @@ export const useFocusStore = create<FocusState>((set, get) => ({
 
     // Update DB status
     try {
-        if (Platform.OS !== 'web') await DatabaseService.updateSessionStatus(state.currentSessionId, 'focus');
-    } catch (e) {}
+        if (Platform.OS !== 'web') {
+            await DatabaseService.updateSessionStatus(state.currentSessionId, 'focus');
+        }
+        set({ lastError: null });
+    } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+        console.error("Failed to resume session in database:", errorMessage);
+        set({ lastError: `Resume failed: ${errorMessage}` });
+    }
 
     set({
       status: 'focus',
@@ -149,8 +174,15 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     const state = get();
     if (state.currentSessionId && state.currentSession) {
       try {
-          if (Platform.OS !== 'web') await DatabaseService.abandonSession(state.currentSessionId, state.currentSession.dayId);
-      } catch (e) {}
+          if (Platform.OS !== 'web') {
+              await DatabaseService.abandonSession(state.currentSessionId, state.currentSession.dayId);
+          }
+          set({ lastError: null });
+      } catch (e) {
+          const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+          console.error("Failed to abandon session in database:", errorMessage);
+          set({ lastError: `Abandon failed: ${errorMessage}` });
+      }
     }
 
     set({
@@ -198,7 +230,7 @@ export const useFocusStore = create<FocusState>((set, get) => ({
       currentSession: null,
       endTime: null,
       pausedTimeRemaining: null,
-      timer: 25 * 60, // Reset to default focus time
+      timer: TIMER_CONFIG.DEFAULT_FOCUS_DURATION * 60, // Reset to default focus time
     });
   },
 
@@ -206,8 +238,15 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     const state = get();
     if (state.currentSessionId && state.currentSession) {
         try {
-            if (Platform.OS !== 'web') await DatabaseService.completeSession(state.currentSessionId, state.currentSession.dayId);
-        } catch (e) {}
+            if (Platform.OS !== 'web') {
+                await DatabaseService.completeSession(state.currentSessionId, state.currentSession.dayId);
+            }
+            set({ lastError: null });
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+            console.error("Failed to complete session in database:", errorMessage);
+            set({ lastError: `Complete session failed: ${errorMessage}` });
+        }
     }
 
     set((state) => ({
@@ -220,8 +259,15 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     if (!state.currentSession) return;
 
     try {
-        if (Platform.OS !== 'web') await DatabaseService.addInterruption(interruption);
-    } catch (e) {}
+        if (Platform.OS !== 'web') {
+            await DatabaseService.addInterruption(interruption);
+        }
+        set({ lastError: null });
+    } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+        console.error("Failed to add interruption to database:", errorMessage);
+        set({ lastError: `Add interruption failed: ${errorMessage}` });
+    }
 
     set({
       currentSession: {
@@ -236,8 +282,15 @@ export const useFocusStore = create<FocusState>((set, get) => ({
      if (!state.currentSession) return;
 
      try {
-         if (Platform.OS !== 'web') await DatabaseService.logBreakActivity(activity);
-     } catch (e) {}
+         if (Platform.OS !== 'web') {
+             await DatabaseService.logBreakActivity(activity);
+         }
+         set({ lastError: null });
+     } catch (e) {
+         const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+         console.error("Failed to log break activity to database:", errorMessage);
+         set({ lastError: `Log break activity failed: ${errorMessage}` });
+     }
 
      set((state) => ({
          currentSession: {
@@ -249,13 +302,16 @@ export const useFocusStore = create<FocusState>((set, get) => ({
 
   reset: () => set({
     status: 'idle',
-    timer: 25 * 60,
+    timer: TIMER_CONFIG.DEFAULT_FOCUS_DURATION * 60,
     endTime: null,
     pausedTimeRemaining: null,
     completedSessionsCount: 0,
     currentSessionId: null,
-    currentSession: null
-  })
+    currentSession: null,
+    lastError: null,
+  }),
+
+  clearError: () => set({ lastError: null }),
 }));
 
 async function scheduleEndNotification(seconds: number) {

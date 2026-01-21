@@ -2,10 +2,12 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/Colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusStore } from '@/store/useFocusStore';
 
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const completedSessionsCount = useFocusStore((state) => state.completedSessionsCount);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
@@ -22,7 +24,9 @@ export default function HomeScreen() {
         </TouchableOpacity>
 
         <View style={styles.statsContainer}>
-          <Text style={styles.statsText}>Today: 0 completed · 0 interrupted</Text>
+          <Text style={styles.statsText}>
+            Today: {completedSessionsCount} completed
+          </Text>
         </View>
 
         <TouchableOpacity
