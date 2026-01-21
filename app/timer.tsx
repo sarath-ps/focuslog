@@ -12,7 +12,7 @@ export default function TimerScreen() {
     status,
     pauseSession,
     syncTimer,
-    endSession,
+    abandonSession,
     completeSession,
     completedSessionsCount
   } = useFocusStore();
@@ -81,7 +81,7 @@ export default function TimerScreen() {
 
   const handleEnd = () => {
       cancelNotifications();
-      endSession();
+      abandonSession();
       router.replace('/');
   };
 

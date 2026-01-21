@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { SessionStatus, Session, Interruption, BreakActivity } from '@/types';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import { DatabaseService } from '@/services/DatabaseService';
 
 // Configure notifications only if not on web (or wrap in check)
 if (Platform.OS !== 'web') {
@@ -23,23 +24,20 @@ interface FocusState {
   currentSessionId: string | null;
   currentSession: Session | null;
 
-  // Timestamps for robustness
-  endTime: number | null; // epoch ms
-  pausedAt: number | null; // epoch ms
-
   // Actions
+  init: () => Promise<void>;
   setStatus: (status: SessionStatus) => void;
   syncTimer: () => void; // Updates 'timer' based on 'endTime'
-  startSession: (session: Session) => void;
-  pauseSession: () => void;
-  resumeSession: () => void;
-  endSession: () => void;
+  startSession: (session: Session) => Promise<void>;
+  pauseSession: () => Promise<void>;
+  resumeSession: () => Promise<void>;
+  abandonSession: () => Promise<void>;
   startBreak: (durationMinutes: number) => void;
 
   // Data logging
-  addInterruption: (interruption: Interruption) => void;
+  addInterruption: (interruption: Interruption) => Promise<void>;
   setBreakActivity: (activity: BreakActivity) => void;
-  completeSession: () => void;
+  completeSession: () => Promise<void>;
   reset: () => void;
 }
 
@@ -51,6 +49,10 @@ export const useFocusStore = create<FocusState>((set, get) => ({
   completedSessionsCount: 0,
   currentSessionId: null,
   currentSession: null,
+
+  init: async () => {
+    await DatabaseService.initDatabase();
+  },
 
   setStatus: (status) => set({ status }),
 
@@ -66,49 +68,75 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     return {};
   }),
 
-  startSession: (session) => {
+  startSession: async (session) => {
+    // Ensure DayLog exists
+    const date = session.startTime.split('T')[0];
+    const dayId = await DatabaseService.ensureDayLog(date);
+    const sessionWithDay = { ...session, dayId };
+
+    await DatabaseService.createSession(sessionWithDay);
+
     const durationSeconds = session.durationMinutes * 60;
     const endTime = Date.now() + durationSeconds * 1000;
     set({
       status: 'focus',
       currentSessionId: session.id,
-      currentSession: session,
+      currentSession: sessionWithDay,
       timer: durationSeconds,
       endTime: endTime,
       pausedTimeRemaining: null,
     });
   },
 
-  pauseSession: () => set((state) => {
-    if (!state.endTime) return {}; // Should not happen if strictly typed/logic
+  pauseSession: async () => {
+    const state = get();
+    if (!state.endTime || !state.currentSessionId) return;
+
     const now = Date.now();
     const remaining = Math.max(0, Math.ceil((state.endTime - now) / 1000));
-    return {
+
+    // Update DB status
+    await DatabaseService.updateSessionStatus(state.currentSessionId, 'paused');
+
+    set({
       status: 'paused',
       endTime: null,
       pausedTimeRemaining: remaining,
       timer: remaining, // Update display one last time
-    };
-  }),
+    });
+  },
 
-  resumeSession: () => set((state) => {
-    if (state.pausedTimeRemaining === null) return {};
+  resumeSession: async () => {
+    const state = get();
+    if (state.pausedTimeRemaining === null || !state.currentSessionId) return;
+
     const newEndTime = Date.now() + state.pausedTimeRemaining * 1000;
-    return {
+
+    // Update DB status
+    await DatabaseService.updateSessionStatus(state.currentSessionId, 'focus');
+
+    set({
       status: 'focus',
       endTime: newEndTime,
       pausedTimeRemaining: null,
-    };
-  }),
+    });
+  },
 
-  endSession: () => set({
-    status: 'idle',
-    currentSessionId: null,
-    currentSession: null,
-    endTime: null,
-    pausedTimeRemaining: null,
-    timer: 25 * 60, // Reset default
-  }),
+  abandonSession: async () => {
+    const state = get();
+    if (state.currentSessionId && state.currentSession) {
+      await DatabaseService.abandonSession(state.currentSessionId, state.currentSession.dayId);
+    }
+
+    set({
+      status: 'idle',
+      currentSessionId: null,
+      currentSession: null,
+      endTime: null,
+      pausedTimeRemaining: null,
+      timer: 25 * 60, // Reset default
+    });
+  },
 
   startBreak: (durationMinutes) => {
     const durationSeconds = durationMinutes * 60;
@@ -121,19 +149,30 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     });
   },
 
-  completeSession: () => set((state) => ({
-    completedSessionsCount: state.completedSessionsCount + 1
-  })),
+  completeSession: async () => {
+    const state = get();
+    if (state.currentSessionId && state.currentSession) {
+        await DatabaseService.completeSession(state.currentSessionId, state.currentSession.dayId);
+    }
 
-  addInterruption: (interruption) => set((state) => {
-    if (!state.currentSession) return {};
-    return {
+    set((state) => ({
+      completedSessionsCount: state.completedSessionsCount + 1
+    }));
+  },
+
+  addInterruption: async (interruption) => {
+    const state = get();
+    if (!state.currentSession) return;
+
+    await DatabaseService.addInterruption(interruption);
+
+    set({
       currentSession: {
         ...state.currentSession,
         interruptions: [...state.currentSession.interruptions, interruption]
       }
-    };
-  }),
+    });
+  },
 
   setBreakActivity: (activity) => set((state) => {
      if (!state.currentSession) return {};
