@@ -17,6 +17,9 @@ if (Platform.OS !== 'web') {
 interface FocusState {
   status: SessionStatus;
   timer: number; // in seconds (display value)
+  endTime: number | null; // Timestamp when the current timer ends
+  pausedTimeRemaining: number | null; // Seconds remaining when paused
+  completedSessionsCount: number;
   currentSessionId: string | null;
   currentSession: Session | null;
 
@@ -25,6 +28,8 @@ interface FocusState {
   pausedAt: number | null; // epoch ms
 
   // Actions
+  setStatus: (status: SessionStatus) => void;
+  syncTimer: () => void; // Updates 'timer' based on 'endTime'
   startSession: (session: Session) => void;
   pauseSession: () => void;
   resumeSession: () => void;
@@ -34,97 +39,91 @@ interface FocusState {
   // Data logging
   addInterruption: (interruption: Interruption) => void;
   setBreakActivity: (activity: BreakActivity) => void;
-
-  // Timer tick (called by interval)
-  tick: () => void;
+  completeSession: () => void;
+  reset: () => void;
 }
 
 export const useFocusStore = create<FocusState>((set, get) => ({
   status: 'idle',
   timer: 25 * 60,
+  endTime: null,
+  pausedTimeRemaining: null,
+  completedSessionsCount: 0,
   currentSessionId: null,
   currentSession: null,
-  endTime: null,
-  pausedAt: null,
 
-  startSession: async (session) => {
-    // Schedule notification
-    const durationSec = session.durationMinutes * 60;
-    const endTime = Date.now() + durationSec * 1000;
+  setStatus: (status) => set({ status }),
 
-    await scheduleEndNotification(durationSec);
+  // Call this in a loop/interval from the UI
+  syncTimer: () => set((state) => {
+    if (state.status === 'paused' || state.status === 'idle') return {};
 
+    if (state.endTime) {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((state.endTime - now) / 1000));
+      return { timer: remaining };
+    }
+    return {};
+  }),
+
+  startSession: (session) => {
+    const durationSeconds = session.durationMinutes * 60;
+    const endTime = Date.now() + durationSeconds * 1000;
     set({
       status: 'focus',
       currentSessionId: session.id,
       currentSession: session,
-      timer: durationSec,
+      timer: durationSeconds,
       endTime: endTime,
-      pausedAt: null
+      pausedTimeRemaining: null,
     });
   },
 
-  pauseSession: async () => {
-    const { endTime } = get();
-    if (endTime) {
-        if (Platform.OS !== 'web') {
-            await Notifications.cancelAllScheduledNotificationsAsync();
-        }
-        // Calculate remaining time to preserve it
-        const now = Date.now();
-        const remainingMs = Math.max(0, endTime - now);
-
-        set({
-            status: 'paused',
-            pausedAt: now,
-            endTime: null, // Clear end time as it's no longer valid until resumed
-            timer: Math.ceil(remainingMs / 1000)
-        });
-    } else {
-         set({ status: 'paused' });
-    }
-  },
-
-  resumeSession: async () => {
-    const { timer } = get();
-    // New end time = Now + remaining timer
-    const endTime = Date.now() + timer * 1000;
-
-    await scheduleEndNotification(timer);
-
-    set({
-        status: 'focus',
-        endTime,
-        pausedAt: null
-    });
-  },
-
-  endSession: async () => {
-    if (Platform.OS !== 'web') {
-        await Notifications.cancelAllScheduledNotificationsAsync();
-    }
-    set({
-      status: 'idle',
-      currentSessionId: null,
-      currentSession: null,
+  pauseSession: () => set((state) => {
+    if (!state.endTime) return {}; // Should not happen if strictly typed/logic
+    const now = Date.now();
+    const remaining = Math.max(0, Math.ceil((state.endTime - now) / 1000));
+    return {
+      status: 'paused',
       endTime: null,
-      pausedAt: null
-    });
-  },
+      pausedTimeRemaining: remaining,
+      timer: remaining, // Update display one last time
+    };
+  }),
 
-  startBreak: async (durationMinutes) => {
-    const durationSec = durationMinutes * 60;
-    const endTime = Date.now() + durationSec * 1000;
+  resumeSession: () => set((state) => {
+    if (state.pausedTimeRemaining === null) return {};
+    const newEndTime = Date.now() + state.pausedTimeRemaining * 1000;
+    return {
+      status: 'focus',
+      endTime: newEndTime,
+      pausedTimeRemaining: null,
+    };
+  }),
 
-    await scheduleEndNotification(durationSec);
+  endSession: () => set({
+    status: 'idle',
+    currentSessionId: null,
+    currentSession: null,
+    endTime: null,
+    pausedTimeRemaining: null,
+    timer: 25 * 60, // Reset default
+  }),
 
+  startBreak: (durationMinutes) => {
+    const durationSeconds = durationMinutes * 60;
+    const endTime = Date.now() + durationSeconds * 1000;
     set({
       status: 'break',
-      timer: durationSec,
-      endTime,
-      pausedAt: null
+      timer: durationSeconds,
+      endTime: endTime,
+      pausedTimeRemaining: null,
     });
   },
+
+  completeSession: () => set((state) => ({
+    completedSessionsCount: state.completedSessionsCount + 1
+  })),
 
   addInterruption: (interruption) => set((state) => {
     if (!state.currentSession) return {};
@@ -146,15 +145,14 @@ export const useFocusStore = create<FocusState>((set, get) => ({
      };
   }),
 
-  tick: () => set((state) => {
-      if (state.status === 'paused' || state.status === 'idle') return {};
-
-      if (state.endTime) {
-          const now = Date.now();
-          const remainingSeconds = Math.max(0, Math.ceil((state.endTime - now) / 1000));
-          return { timer: remainingSeconds };
-      }
-      return {};
+  reset: () => set({
+    status: 'idle',
+    timer: 25 * 60,
+    endTime: null,
+    pausedTimeRemaining: null,
+    completedSessionsCount: 0,
+    currentSessionId: null,
+    currentSession: null
   })
 }));
 
