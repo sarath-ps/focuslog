@@ -3,6 +3,7 @@ import { SessionStatus, Session, Interruption, BreakActivity } from '@/types';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { DatabaseService } from '@/services/DatabaseService';
+import { TIMER_CONFIG } from '@/constants/Config';
 
 // Configure notifications only if not on web (or wrap in check)
 if (Platform.OS !== 'web') {
@@ -45,7 +46,7 @@ interface FocusState {
 
 export const useFocusStore = create<FocusState>((set, get) => ({
   status: 'idle',
-  timer: 25 * 60,
+  timer: TIMER_CONFIG.DEFAULT_FOCUS_DURATION * 60,
   endTime: null,
   pausedTimeRemaining: null,
   completedSessionsCount: 0,
@@ -81,7 +82,7 @@ export const useFocusStore = create<FocusState>((set, get) => ({
   }),
 
   startSession: async (session) => {
-    let dayId = 'mock-day-id';
+    let dayId: string | undefined = 'mock-day-id';
 
     try {
         // Ensure DayLog exists
@@ -99,7 +100,7 @@ export const useFocusStore = create<FocusState>((set, get) => ({
     set({
       status: 'focus',
       currentSessionId: session.id,
-      currentSession: { ...session, dayId } as any,
+      currentSession: { ...session, dayId },
       timer: durationSeconds,
       endTime: endTime,
       pausedTimeRemaining: null,
@@ -158,7 +159,7 @@ export const useFocusStore = create<FocusState>((set, get) => ({
       currentSession: null,
       endTime: null,
       pausedTimeRemaining: null,
-      timer: 25 * 60, // Reset default
+      timer: TIMER_CONFIG.DEFAULT_FOCUS_DURATION * 60, // Reset default
     });
   },
 

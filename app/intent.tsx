@@ -4,6 +4,7 @@ import { Colors } from '@/constants/Colors';
 import { useFocusStore } from '@/store/useFocusStore';
 import { Session } from '@/types';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
+import { TIMER_CONFIG } from '@/constants/Config';
 import { useState } from 'react';
 
 export default function IntentScreen() {
@@ -17,7 +18,7 @@ export default function IntentScreen() {
         id: Date.now().toString(),
         status: 'focus',
         startTime: new Date().toISOString(),
-        durationMinutes: 25,
+        durationMinutes: TIMER_CONFIG.DEFAULT_FOCUS_DURATION,
         elapsedSeconds: 0,
         interruptions: [],
         intentCategory,

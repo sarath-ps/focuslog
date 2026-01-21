@@ -8,20 +8,24 @@ export type VoiceNote = {
   createdAt: string; // ISO date
 };
 
+export type InterruptionCategory = 'door' | 'work_call' | 'family' | 'notification' | 'lost_focus' | 'other';
+
 export type Interruption = {
   id: string;
   sessionId: string;
-  type: 'voice' | 'touch';
-  category: 'door' | 'call' | 'family' | 'notification' | 'focus_loss' | 'other';
+  source: 'voice' | 'touch';
+  category: InterruptionCategory;
   voiceNote?: VoiceNote;
   createdAt: string;
 };
+
+export type BreakActivityCategory = 'coffee' | 'phone' | 'social' | 'walk' | 'food' | 'rest' | 'other';
 
 export type BreakActivity = {
   id: string;
   sessionId: string;
   type: 'voice' | 'touch';
-  category: 'coffee' | 'phone' | 'social' | 'walk' | 'food' | 'rest' | 'other';
+  category: BreakActivityCategory;
   voiceNote?: VoiceNote;
   createdAt: string;
 };
@@ -33,6 +37,7 @@ export type Session = {
   endTime?: string;
   durationMinutes: number; // Planned duration
   elapsedSeconds: number; // Actual focus time
+  dayId?: string; // Reference to the day log this session belongs to
 
   // Intent
   intentVoiceNote?: VoiceNote;

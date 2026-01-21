@@ -4,6 +4,7 @@ import { Colors } from '@/constants/Colors';
 import { useFocusStore } from '@/store/useFocusStore';
 import { useNotifications } from '@/hooks/useNotifications';
 import { BreakActivity } from '@/types';
+import { TIMER_CONFIG } from '@/constants/Config';
 import { useEffect } from 'react';
 
 export default function BreakScreen() {
@@ -24,7 +25,7 @@ export default function BreakScreen() {
   useEffect(() => {
      // If we just landed here from Timer, we need to initialize the break
      if (status === 'focus') {
-         startBreak(5); // Default 5 min break
+         startBreak(TIMER_CONFIG.DEFAULT_BREAK_DURATION);
      }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
@@ -71,9 +72,9 @@ export default function BreakScreen() {
 
   const handleExtendBreak = () => {
       cancelNotifications(); // Cancel 'Break Over' notification
-      extendBreak(5);
-      // Re-schedule notification for new time
-      scheduleNotification(timer + (5 * 60), 'Break Over', 'Time to focus again!');
+      extendBreak(TIMER_CONFIG.BREAK_EXTENSION_DURATION);
+      // Re-schedule notification for new time (current timer + extension duration)
+      scheduleNotification(timer + (TIMER_CONFIG.BREAK_EXTENSION_DURATION * 60), 'Break Over', 'Time to focus again!');
   };
 
   const handleEndBreak = () => {
